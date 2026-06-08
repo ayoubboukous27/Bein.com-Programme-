@@ -1,36 +1,33 @@
 name: Generate beIN EPG
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "0 */6 * * *"  # كل 6 ساعات
+    - cron: "0 5 * * *"  # يوميًا الساعة 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  generate:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      # تثبيت Mono لتشغيل WebGrab+Plus
-      - name: Install Mono
-        run: |
-          sudo apt update
-          sudo apt install -y mono-complete
-
-      # تشغيل WebGrab+Plus
-      - name: Run WebGrab++
-        run: |
-          cd config
-          mono WebGrab++.exe
-
-      # نسخ guide.xml إلى مجلد output
-      - name: Copy guide.xml
-        run: |
-          cp guide.xml ../output/guide.xml
-
-      # Commit and push guide.xml تلقائياً
-      - uses: stefanzweifel/git-auto-commit-action@v5
+      - uses: actions/setup-python@v5
         with:
-          commit_message: "Update guide.xml"
-          file_pattern: "output/guide.xml"
+          python-version: "3.11"
+
+      - run: pip install requests beautifulsoup4 lxml
+
+      - run: python scripts/generate_epg.py
+
+      - name: Commit & Push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add output/guide.xml
+          git diff-index --quiet HEAD || git commit -m "Update beIN EPG"
+          git pull --rebase origin main
+          git push origin main
