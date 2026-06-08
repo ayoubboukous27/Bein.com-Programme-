@@ -31,50 +31,192 @@ for site_id, info in channels.items():
     if info["logo"]:
         ET.SubElement(channel, "icon", src=info["logo"])
 
-# سحب بيانات EPG لمدة 7 أيام
-for day in range(7):
+# سحب بيانات EPG لمدة 10 أيام
+for day in range(10):
     current_date = datetime.utcnow() + timedelta(days=day)
     date_str = current_date.strftime("%Y-%m-%d")
-    url = f"https://www.bein.com/en/epg-ajax-template/?action=epg_fetch&offset=-2&category=sports&serviceidentity=bein.net&mins=00&cdate={date_str}&language=EN&postid=25356&loadindex=0"
+
+    url = (
+        f"https://www.bein.com/en/epg-ajax-template/"
+        f"?action=epg_fetch"
+        f"&offset=-2"
+        f"&category=sports"
+        f"&serviceidentity=bein.net"
+        f"&mins=00"
+        f"&cdate={date_str}"
+        f"&language=EN"
+        f"&postid=25356"
+        f"&loadindex=0"
+    )
+
     print("Fetching:", url)
+
     response = requests.get(url, timeout=60)
     response.raise_for_status()
+
     soup = BeautifulSoup(response.text, "html.parser")
-    rows = soup.find_all("div", id=lambda x: x and x.startswith("channels_"))
+
+    rows = soup.find_all(
+        "div",
+        id=lambda x: x and x.startswith("channels_")
+    )
+
     for row in rows:
+
         link = row.find("a", href=True)
+
         if not link:
             continue
-        site_id = link["href"].split("/")[-1].strip()
+
+        site_id = (
+            link["href"]
+            .split("/")[-1]
+            .strip()
+        )
+
         if site_id not in channels:
             continue
+
         items = row.select("li[data-start]")
+
         for item in items:
-            title_tag = item.find("p", class_="title")
+
+            title_tag = item.find(
+                "p",
+                class_="title"
+            )
+
             if not title_tag:
                 continue
-            title = title_tag.get_text(strip=True)
-            category_tag = item.find("p", class_="format")
-            category = category_tag.get_text(strip=True) if category_tag else ""
+
+            title = title_tag.get_text(
+                strip=True
+            )
+
+            category_tag = item.find(
+                "p",
+                class_="format"
+            )
+
+            category = (
+                category_tag.get_text(strip=True)
+                if category_tag else ""
+            )
+
+            # DESC
+            description = ""
+
+            desc_tag = item.find(
+                "p",
+                class_="description"
+            )
+
+            if desc_tag:
+                description = desc_tag.get_text(
+                    " ",
+                    strip=True
+                )
+
+            if not description:
+                description = item.get(
+                    "data-desc",
+                    ""
+                ).strip()
+
             try:
-                start_hour = int(item.get("data-start", "0"))
-                start_min = int(item.get("data-start-m", "0"))
-                end_hour = int(item.get("data-end", "0"))
-                end_min = int(item.get("data-end-m", "0"))
+                start_hour = int(
+                    item.get("data-start", "0")
+                )
+
+                start_min = int(
+                    item.get("data-start-m", "0")
+                )
+
+                end_hour = int(
+                    item.get("data-end", "0")
+                )
+
+                end_min = int(
+                    item.get("data-end-m", "0")
+                )
+
             except:
                 continue
-            start_dt = datetime(current_date.year, current_date.month, current_date.day, start_hour, start_min)
-            end_dt = datetime(current_date.year, current_date.month, current_date.day, end_hour, end_min)
+
+            start_dt = datetime(
+                current_date.year,
+                current_date.month,
+                current_date.day,
+                start_hour,
+                start_min
+            )
+
+            end_dt = datetime(
+                current_date.year,
+                current_date.month,
+                current_date.day,
+                end_hour,
+                end_min
+            )
+
             if end_dt <= start_dt:
                 end_dt += timedelta(days=1)
-            programme = ET.SubElement(tv, "programme", {
-                "channel": site_id,
-                "start": start_dt.strftime("%Y%m%d%H%M%S +0000"),
-                "stop": end_dt.strftime("%Y%m%d%H%M%S +0000")
-            })
-            ET.SubElement(programme, "title").text = title
-            if category:
-                ET.SubElement(programme, "category").text = category
 
-ET.ElementTree(tv).write(OUTPUT_FILE, encoding="utf-8", xml_declaration=True)
+            programme = ET.SubElement(
+                tv,
+                "programme",
+                {
+                    "channel": site_id,
+                    "start": start_dt.strftime(
+                        "%Y%m%d%H%M%S +0000"
+                    ),
+                    "stop": end_dt.strftime(
+                        "%Y%m%d%H%M%S +0000"
+                    )
+                }
+            )
+
+            ET.SubElement(
+                programme,
+                "title"
+            ).text = title
+
+            if description:
+                ET.SubElement(
+                    programme,
+                    "desc"
+                ).text = description
+
+            if category:
+                ET.SubElement(
+                    programme,
+                    "category"
+                ).text = category
+
+            # بوستر البرامج
+            if site_id in [
+                "beINSPORTSMAX1",
+                "beINSPORTSMAX2",
+                "beINSPORTSMAX3",
+                "beINSPORTSMAX4",
+                "beINSPORTSMAX5",
+                "beINSPORTSMAX6",
+                "beINSPORTS4KHDR"
+            ]:
+                poster = "https://github.com/ayoubboukous27/Multi-providers-EPG-/raw/refs/heads/main/OG_FB_1200x630_ar.jpg"
+            else:
+                poster = "https://github.com/ayoubboukous27/Multi-providers-EPG-/raw/refs/heads/main/maxresdefault.jpg"
+
+            ET.SubElement(
+                programme,
+                "icon",
+                src=poster
+            )
+
+ET.ElementTree(tv).write(
+    OUTPUT_FILE,
+    encoding="utf-8",
+    xml_declaration=True
+)
+
 print("Saved:", OUTPUT_FILE)
