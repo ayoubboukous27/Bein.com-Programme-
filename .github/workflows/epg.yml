@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write   # <- هذا يضمن صلاحية الكتابة على المستودع
 
 jobs:
   generate:
@@ -27,26 +27,7 @@ jobs:
           pip install requests beautifulsoup4 lxml
 
       - name: Generate EPG
-        run: |
-          python scripts/generate_epg.py
-
-      - name: Commit & Push
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add output/guide.xml
-          git diff --quiet || git commit -m "Update beIN EPG"
-          git pull --rebase origin main
-          git push origin main          mkdir -p output
-
-      - name: Generate EPG
-        run: |
-          python scripts/generate_epg.py
-
-      - name: Verify guide.xml
-        run: |
-          ls -lah output
-          test -f output/guide.xml
+        run: python scripts/generate_epg.py
 
       - name: Commit & Push
         run: |
@@ -57,8 +38,8 @@ jobs:
 
           if git diff --staged --quiet; then
             echo "No changes"
-          else
-            git commit -m "Update beIN EPG"
-            git pull --rebase origin main
-            git push
+            exit 0
           fi
+
+          git commit -m "Update beIN EPG"
+          git push
