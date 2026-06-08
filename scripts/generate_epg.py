@@ -4,111 +4,77 @@ import xml.etree.ElementTree as ET
 import requests
 from bs4 import BeautifulSoup
 
-EPG_DAYS = 10
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 CHANNELS_FILE = BASE_DIR / "channels" / "bein.com.channels.full.logo.xml"
 OUTPUT_FILE = BASE_DIR / "output" / "guide.xml"
+
 OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-# Poster URLs
-MAX_POSTER = "https://github.com/ayoubboukous27/Multi-providers-EPG-/raw/refs/heads/main/OG_FB_1200x630_ar.jpg"
-DEFAULT_POSTER = "https://github.com/ayoubboukous27/Multi-providers-EPG-/raw/refs/heads/main/maxresdefault.jpg"
-
-# Load channels
 tree = ET.parse(CHANNELS_FILE)
 root = tree.getroot()
+
 channels = {}
 for ch in root.findall("channel"):
-    site_id = ch.attrib.get("id") or ch.attrib.get("site_id")
+    site_id = ch.attrib.get("site_id")
     channels[site_id] = {
         "name": (ch.text or site_id).strip(),
         "logo": ch.attrib.get("logo", "")
     }
 
-# XMLTV root
-tv = ET.Element("tv", {"generator-info-name": "beIN GitHub EPG"})
+tv = ET.Element("tv")
 
-# Add channels
+# إضافة القنوات
 for site_id, info in channels.items():
-    ch_elem = ET.SubElement(tv, "channel", id=site_id)
-    ET.SubElement(ch_elem, "display-name").text = info["name"]
+    channel = ET.SubElement(tv, "channel", id=site_id)
+    ET.SubElement(channel, "display-name").text = info["name"]
     if info["logo"]:
-        ET.SubElement(ch_elem, "icon", src=info["logo"])
+        ET.SubElement(channel, "icon", src=info["logo"])
 
-# Fetch EPG directly from AJAX
-for day in range(EPG_DAYS):
+# سحب بيانات EPG لمدة 7 أيام
+for day in range(7):
     current_date = datetime.utcnow() + timedelta(days=day)
     date_str = current_date.strftime("%Y-%m-%d")
-    url = (
-        f"https://www.bein.com/en/epg-ajax-template/"
-        f"?action=epg_fetch&offset=-2&category=sports&serviceidentity=bein.net&mins=00"
-        f"&cdate={date_str}&language=EN&postid=25356&loadindex=0"
-    )
-    print(f"Fetching {date_str}")
-    response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=60)
+    url = f"https://www.bein.com/en/epg-ajax-template/?action=epg_fetch&offset=-2&category=sports&serviceidentity=bein.net&mins=00&cdate={date_str}&language=EN&postid=25356&loadindex=0"
+    print("Fetching:", url)
+    response = requests.get(url, timeout=60)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
-
-    items = soup.find_all("li", attrs={"data-start": True})
-    for item in items:
-        parent_div = item.find_parent("div", id=lambda x: x and x.startswith("channels_"))
-        if not parent_div:
+    rows = soup.find_all("div", id=lambda x: x and x.startswith("channels_"))
+    for row in rows:
+        link = row.find("a", href=True)
+        if not link:
             continue
-        channel_id = parent_div.get("id", "beINSPORTS1")
-
-        # Poster logic
-        if channel_id.upper() in [
-            "BEINSPORTSMAX1","BEINSPORTSMAX2","BEINSPORTSMAX3",
-            "BEINSPORTSMAX4","BEINSPORTSMAX5","BEINSPORTSMAX6","BEINSPORTS4KHDR"
-        ]:
-            poster = MAX_POSTER
-        else:
-            poster = DEFAULT_POSTER
-
-        # Title
-        title_tag = item.find("p", class_="title")
-        if not title_tag:
+        site_id = link["href"].split("/")[-1].strip()
+        if site_id not in channels:
             continue
-        title = title_tag.get_text(strip=True)
+        items = row.select("li[data-start]")
+        for item in items:
+            title_tag = item.find("p", class_="title")
+            if not title_tag:
+                continue
+            title = title_tag.get_text(strip=True)
+            category_tag = item.find("p", class_="format")
+            category = category_tag.get_text(strip=True) if category_tag else ""
+            try:
+                start_hour = int(item.get("data-start", "0"))
+                start_min = int(item.get("data-start-m", "0"))
+                end_hour = int(item.get("data-end", "0"))
+                end_min = int(item.get("data-end-m", "0"))
+            except:
+                continue
+            start_dt = datetime(current_date.year, current_date.month, current_date.day, start_hour, start_min)
+            end_dt = datetime(current_date.year, current_date.month, current_date.day, end_hour, end_min)
+            if end_dt <= start_dt:
+                end_dt += timedelta(days=1)
+            programme = ET.SubElement(tv, "programme", {
+                "channel": site_id,
+                "start": start_dt.strftime("%Y%m%d%H%M%S +0000"),
+                "stop": end_dt.strftime("%Y%m%d%H%M%S +0000")
+            })
+            ET.SubElement(programme, "title").text = title
+            if category:
+                ET.SubElement(programme, "category").text = category
 
-        # Description
-        description = item.get("data-desc", "")
-        desc_tag = item.find("p", class_="description")
-        if desc_tag:
-            description = desc_tag.get_text(" ", strip=True)
-        if not description:
-            description = f"Watch {title} live on beIN Sports."
-
-        # Category
-        category_tag = item.find("p", class_="format")
-        category = category_tag.get_text(strip=True) if category_tag else ""
-
-        # Start / End
-        try:
-            start_hour = int(item.get("data-start", "0"))
-            start_min = int(item.get("data-start-m", "0"))
-            end_hour = int(item.get("data-end", "0"))
-            end_min = int(item.get("data-end-m", "0"))
-        except:
-            continue
-
-        start_dt = datetime(current_date.year, current_date.month, current_date.day, start_hour, start_min)
-        end_dt = datetime(current_date.year, current_date.month, current_date.day, end_hour, end_min)
-        if end_dt <= start_dt:
-            end_dt += timedelta(days=1)
-
-        prog = ET.SubElement(tv, "programme", {
-            "channel": channel_id,
-            "start": start_dt.strftime("%Y%m%d%H%M%S +0000"),
-            "stop": end_dt.strftime("%Y%m%d%H%M%S +0000")
-        })
-        ET.SubElement(prog, "title", lang="ar").text = title
-        ET.SubElement(prog, "desc").text = description  # <- desc بدون lang
-        if category:
-            ET.SubElement(prog, "category").text = category
-        if poster:
-            ET.SubElement(prog, "icon", src=poster)
-
-# Save XML
 ET.ElementTree(tv).write(OUTPUT_FILE, encoding="utf-8", xml_declaration=True)
-print(f"Guide saved to: {OUTPUT_FILE}")
+print("Saved:", OUTPUT_FILE)
