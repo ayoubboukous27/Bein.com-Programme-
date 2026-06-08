@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings>
+  <filename>guide.xml</filename>
+  <siteini>bein.com.ini</siteini>
+  <output>xmltv</output>
+  <channels>
+    <channel id="beINSPORTS1"/>
+    <channel id="beINSPORTS2"/>
+    <channel id="beINSPORTS3"/>
+    <channel id="beINSPORT4"/>
+    <channel id="beINSPORTS5"/>
+    <channel id="beINSPORTS6"/>
+    <channel id="beINSPORTS7"/>
+    <channel id="beINSPORTS8"/>
+    <channel id="beINSPORTS9"/>
+    <channel id="beINSPORTSNews"/>
+    <channel id="beINSPORTS"/>
+    <channel id="beINSPORTS1EN"/>
+    <channel id="beINSPORTS2EN"/>
+    <channel id="beINSPORTS1FR"/>
+    <channel id="beINSPORTS2FR"/>
+    <channel id="beINSPORTSXTRA1"/>
+    <channel id="beINSPORTSXTRA2"/>
+    <channel id="beINSPORTSXTRA3"/>
+    <channel id="beINSPORTSXTRA4"/>
+    <channel id="beINSPORTSXTRA5"/>
+    <channel id="beINSPORTSXTRA6"/>
+    <channel id="beINSPORTSXTRA7"/>
+    <channel id="beINSPORTSXTRA8"/>
+    <channel id="beINSPORTSXTRA9"/>
+    <channel id="beINSPORTS4KHDR"/>
+    <channel id="beINSPORTSMAX1"/>
+    <channel id="beINSPORTSMAX2"/>
+    <channel id="beINSPORTSMAX3"/>
+    <channel id="beINSPORTSMAX4"/>
+    <channel id="beINSPORTSMAX5"/>
+    <channel id="beINSPORTSMAX6"/>
+  </channels>
+</settings>
