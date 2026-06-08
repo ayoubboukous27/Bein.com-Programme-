@@ -2,7 +2,7 @@ name: Generate beIN EPG
 
 on:
   schedule:
-    - cron: "0 5 * * *"
+    - cron: "0 5 * * *"  # يوميًا الساعة 05:00 UTC
   workflow_dispatch:
 
 permissions:
@@ -26,15 +26,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 lxml
 
-      - name: Debug repository structure
+      - name: Generate EPG
         run: |
-          pwd
-          echo "==== FILES ===="
-          find . -type f
+          python scripts/generate_epg.py
 
-      - name: Create output directory
+      - name: Commit & Push
         run: |
-          mkdir -p output
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add output/guide.xml
+          git diff --quiet || git commit -m "Update beIN EPG"
+          git pull --rebase origin main
+          git push origin main          mkdir -p output
 
       - name: Generate EPG
         run: |
