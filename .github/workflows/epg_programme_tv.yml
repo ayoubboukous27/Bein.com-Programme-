@@ -1,40 +1,74 @@
-name: Generate Programme TV Net EPG
+name: Generate Programme-TV EPG
 
 on:
-  schedule:
-    - cron: "0 5 * * *"  # يوميًا الساعة 05:00 UTC
   workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * *"
 
 permissions:
   contents: write
 
 jobs:
-  generate_epg:
+  epg:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Wine (WebGrab++ requires Windows binary)
+      - name: Install dependencies
         run: |
-          sudo dpkg --add-architecture i386
-          sudo apt update
-          sudo apt install -y wine64 wine32
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
 
-      - name: Download WebGrab++ latest Windows binary
+      - name: Download WebGrab+Plus
         run: |
-          wget https://github.com/TVGamesNL/WebGrabPlusPlus/releases/download/v2.0.0/WebGrab++.exe -O WebGrab++.exe
+          wget https://webgrabplus.com/sites/default/files/download/SW/V5.6.0/WebGrabPlus_5.6_install.tar.gz
+          tar -xzf WebGrabPlus_5.6_install.tar.gz
 
-      - name: Run WebGrab++ for Programme TV Net
+      - name: Install WebGrab+Plus
         run: |
-          wine WebGrab++.exe siteini/programme-tv.net.ini -c channels/programme-tv.net.channels.xml -o output/guide_programme_tv.xml
+          chmod +x install.sh
+          ./install.sh
 
-      - name: Commit & Push updated guide
+      - name: Prepare WebGrab config
+        run: |
+          mkdir -p ~/.wg++
+          cp siteini/programme-tv.net.ini ~/.wg++/
+          cp channels/programme-tv.net.channels.xml ~/.wg++/channels.xml
+
+          cat > ~/.wg++/WebGrab++.config.xml <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <settings>
+            <filename>guide.xml</filename>
+            <mode>n</mode>
+            <postprocess grab="y" run="n">mdb</postprocess>
+            <user-agent>Mozilla/5.0</user-agent>
+          </settings>
+
+          <channels>
+            <channel update="i">channels.xml</channel>
+          </channels>
+          EOF
+
+      - name: Run WebGrab+Plus
+        run: |
+          ~/.wg++/run.net.sh
+
+      - name: Copy output
+        run: |
+          mkdir -p output
+          find ~/.wg++ -name "*.xml" -type f
+          cp ~/.wg++/guide.xml output/guide_programme_tv.xml
+
+      - name: Commit
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+
           git add output/guide_programme_tv.xml
-          git diff-index --quiet HEAD || git commit -m "Update Programme TV Net EPG"
-          git pull --rebase origin main
-          git push origin main
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update Programme-TV EPG"
+            git push
+          fi
