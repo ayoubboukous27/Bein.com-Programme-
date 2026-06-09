@@ -2,7 +2,7 @@ name: Generate Programme TV Net EPG
 
 on:
   schedule:
-    - cron: "0 5 * * *"  # يومياً الساعة 05:00 UTC
+    - cron: "0 5 * * *"  # يوميًا الساعة 05:00 UTC
   workflow_dispatch:
 
 permissions:
@@ -11,23 +11,24 @@ permissions:
 jobs:
   generate_epg:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
+      - name: Setup Wine (WebGrab++ requires Windows binary)
         run: |
-          python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 lxml
+          sudo dpkg --add-architecture i386
+          sudo apt update
+          sudo apt install -y wine64 wine32
 
-      - name: Run Programme TV Net EPG script
+      - name: Download WebGrab++ latest Windows binary
         run: |
-          python scripts/generate_programme_tv.py
+          wget https://github.com/TVGamesNL/WebGrabPlusPlus/releases/download/v2.0.0/WebGrab++.exe -O WebGrab++.exe
+
+      - name: Run WebGrab++ for Programme TV Net
+        run: |
+          wine WebGrab++.exe siteini/programme-tv.net.ini -c channels/programme-tv.net.channels.xml -o output/guide_programme_tv.xml
 
       - name: Commit & Push updated guide
         run: |
