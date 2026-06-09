@@ -1,9 +1,9 @@
-name: Generate Programme-TV EPG
+name: Generate Programme-TV Net EPG
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 5 * * *"
+    - cron: "0 5 * * *"  # يوميًا الساعة 05:00 UTC
 
 permissions:
   contents: write
@@ -13,30 +13,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget tar mono-complete
+          sudo apt-get install -y wget tar mono-complete unzip
 
       - name: Download WebGrab+Plus Linux
         run: |
           wget https://webgrabplus.com/sites/default/files/download/SW/V5.6.0/WebGrabPlus_5.6_install.tar_0.gz
           tar -xzf WebGrabPlus_5.6_install.tar_0.gz
+          chmod +x .wg++/install.sh
+          .wg++/install.sh
 
-      - name: Locate WebGrab files
+      - name: Copy config and channels
         run: |
-          find . -type f | grep -i WebGrab
+          mkdir -p ~/.wg++
+          cp siteini/programme-tv.net.ini ~/.wg++/
+          cp channels/programme-tv.net.channels.xml ~/.wg++/channels.xml
 
-      - name: Prepare configuration
-        run: |
-          mkdir -p wg
-
-          cp siteini/programme-tv.net.ini wg/
-          cp channels/programme-tv.net.channels.xml wg/channels.xml
-
-          cat > wg/WebGrab++.config.xml << 'EOF'
+          cat > ~/.wg++/WebGrab++.config.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <settings>
             <filename>guide_programme_tv.xml</filename>
@@ -44,35 +42,26 @@ jobs:
             <postprocess grab="y" run="n">mdb</postprocess>
             <user-agent>Mozilla/5.0</user-agent>
           </settings>
-
           <channels>
             <channel update="i">channels.xml</channel>
           </channels>
           EOF
 
-      - name: Find executable
-        run: |
-          find . -type f \( -name "*.exe" -o -name "WebGrab+Plus*" -o -name "WebGrab++.exe" \)
-
       - name: Run WebGrab+Plus
         run: |
-          EXE=$(find . -type f -name "WebGrab++.exe" | head -1)
-          mono "$EXE"
+          chmod +x ~/.wg++/run.net.sh
+          ~/.wg++/run.net.sh
 
-      - name: Copy output
+      - name: Copy output guide
         run: |
           mkdir -p output
-          find . -name "*.xml"
-          cp wg/guide_programme_tv.xml output/guide_programme_tv.xml || true
+          cp ~/.wg++/guide_programme_tv.xml output/guide_programme_tv.xml
 
-      - name: Commit changes
+      - name: Commit & Push
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-
-          git add output/*.xml
-
-          if ! git diff --cached --quiet; then
-            git commit -m "Update Programme-TV EPG"
-            git push
-          fi
+          git add output/guide_programme_tv.xml
+          git diff-index --quiet HEAD || git commit -m "Update Programme-TV EPG"
+          git pull --rebase origin main
+          git push origin main
