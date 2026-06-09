@@ -16,31 +16,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install Wine
         run: |
+          sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y wget tar mono-complete unzip
+          sudo apt-get install -y wine64 wine32 unzip wget
 
-      - name: Download WebGrab+Plus Linux
+      - name: Download WebGrab+Plus Windows
         run: |
-          wget https://webgrabplus.com/sites/default/files/download/SW/V5.6.0/WebGrabPlus_5.6_install.tar_0.gz
-          tar -xzf WebGrabPlus_5.6_install.tar_0.gz
-          chmod +x .wg++/install.sh
-          .wg++/install.sh
+          wget https://webgrabplus.com/sites/default/files/download/SW/V5.6.0/WebGrabPlus_5.6_install.zip -O WebGrabPlus_5.6_install.zip
+          unzip WebGrabPlus_5.6_install.zip -d webgrab
 
-      - name: Copy config and channels
+      - name: Install WebGrab+Plus silently
+        run: |
+          cd webgrab
+          wine WebGrabPlus_5.6_install.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+
+      - name: Prepare config and channels
         run: |
           mkdir -p ~/.wg++
           cp siteini/programme-tv.net.ini ~/.wg++/
           cp channels/programme-tv.net.channels.xml ~/.wg++/channels.xml
 
           cat > ~/.wg++/WebGrab++.config.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
+          <?xml version="1.0" encoding="UTF-8"?>
           <settings>
-            <filename>guide_programme_tv.xml</filename>
+            <filename>guide.xml</filename>
             <mode>n</mode>
-            <postprocess grab="y" run="n">mdb</postprocess>
-            <user-agent>Mozilla/5.0</user-agent>
           </settings>
           <channels>
             <channel update="i">channels.xml</channel>
@@ -49,13 +51,14 @@ jobs:
 
       - name: Run WebGrab+Plus
         run: |
-          chmod +x ~/.wg++/run.net.sh
-          ~/.wg++/run.net.sh
+          EXE=$(find ~/.wine -iname "WebGrab+Plus.exe" | head -1)
+          wine "$EXE" ~/.wg++/programme-tv.net.ini
 
-      - name: Copy output guide
+      - name: Copy generated guide
         run: |
           mkdir -p output
-          cp ~/.wg++/guide_programme_tv.xml output/guide_programme_tv.xml
+          GUIDE=$(find ~/.wine -iname "guide.xml" | head -1)
+          cp "$GUIDE" output/guide_programme_tv.xml
 
       - name: Commit & Push
         run: |
